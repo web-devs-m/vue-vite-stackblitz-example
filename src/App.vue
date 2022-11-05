@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Splitpanes, Pane } from 'splitpanes';
+import 'splitpanes/dist/splitpanes.css';
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 // import HelloWorld from './components/HelloWorld.vue'
@@ -16,6 +18,11 @@ import Editor from './components/Editor.vue';
   </div> -->
   <!-- <HelloWorld msg="Vite + Vue" /> -->
   <Editor />
+  <splitpanes class="default-theme" style="height: 400px">
+    <pane v-for="i in 3" :key="i">
+      <div>{{ i }}</div>
+    </pane>
+  </splitpanes>
 </template>
 
 <style scoped>
