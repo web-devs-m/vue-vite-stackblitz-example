@@ -517,7 +517,19 @@ const limit = ref(10000);
 const { text, copy, copied, isSupported } = useClipboard({ legacy: true });
 
 const copyContent = async () => {
-  const content = editor.value.getText();
+  const content = editor.value.getText({
+    blockSeparator: '\n\n',
+    textSerializers: {
+      youtube: ({ node }) => {
+        console.log('Youtube|node -> ', node);
+        return `![](${node.attrs.src})\n\n`;
+      },
+      image: ({ node }) => {
+        console.log('Image|node ->', node);
+        return `![${node.attrs.alt || ''}](${node.attrs.src})\n\n`;
+      },
+    },
+  });
   console.log(content);
   await copy(content);
 };
@@ -659,7 +671,9 @@ tryOnMounted(() => {
       Typography,
       TextStyle,
       Color,
-      Image,
+      Image.configure({
+        allowBase64: true,
+      }),
       Superscript,
       Subscript,
       Underline,
