@@ -1,12 +1,19 @@
 <template>
   <div v-if="editor">
     <button @click="copyContentJson">Copy Content (JSON)</button>
+    <button @click="copyContentHTML">Copy Content (HTML)</button>
     <button @click="copyContent">Copy Content (Plain Text)</button>
     <button @click="addVideo">Add Video</button>
     <button @click="addImage">setImage</button>
     <input
       type="color"
-      @input="editor.chain().focus().setColor(($event as any).target?.value).run()"
+      @input="
+        editor
+          .chain()
+          .focus()
+          .setColor(($event as any).target?.value)
+          .run()
+      "
       :value="editor.getAttributes('textStyle').color"
     />
     <button
@@ -460,209 +467,1326 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue';
-import { tryOnMounted, tryOnBeforeUnmount, useClipboard } from '@vueuse/core';
+import { ref } from "vue";
+import { tryOnMounted, tryOnBeforeUnmount, useClipboard } from "@vueuse/core";
 import {
   BubbleMenu,
   Editor,
   EditorContent,
   FloatingMenu,
   VueNodeViewRenderer,
-} from '@tiptap/vue-3';
-import StarterKit from '@tiptap/starter-kit';
-import CharacterCount from '@tiptap/extension-character-count';
+} from "@tiptap/vue-3";
+import StarterKit from "@tiptap/starter-kit";
+import CharacterCount from "@tiptap/extension-character-count";
 // import Document from '@tiptap/extension-document';
 // import Paragraph from '@tiptap/extension-paragraph';
 // import Text from '@tiptap/extension-text';
-import Youtube from '@tiptap/extension-youtube';
-import Highlight from '@tiptap/extension-highlight';
-import Image from '@tiptap/extension-image';
-import Link from '@tiptap/extension-link';
-import Mention from '@tiptap/extension-mention';
-import Placeholder from '@tiptap/extension-placeholder';
-import Superscript from '@tiptap/extension-superscript';
-import Subscript from '@tiptap/extension-subscript';
+import Youtube from "@tiptap/extension-youtube";
+import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import Mention from "@tiptap/extension-mention";
+import Placeholder from "@tiptap/extension-placeholder";
+import Superscript from "@tiptap/extension-superscript";
+import Subscript from "@tiptap/extension-subscript";
 // import Blockquote from '@tiptap/extension-blockquote';
-import Table from '@tiptap/extension-table'; // its borken for some reason
-import TableCell from '@tiptap/extension-table-cell';
-import TableHeader from '@tiptap/extension-table-header';
-import TableRow from '@tiptap/extension-table-row';
-import TaskItem from '@tiptap/extension-task-item';
-import TaskList from '@tiptap/extension-task-list';
-import TextAlign from '@tiptap/extension-text-align';
-import Underline from '@tiptap/extension-underline';
-import Typography from '@tiptap/extension-typography';
-import TextStyle from '@tiptap/extension-text-style';
-import { Color } from '@tiptap/extension-color';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import css from 'highlight.js/lib/languages/css';
-import js from 'highlight.js/lib/languages/javascript';
-import ts from 'highlight.js/lib/languages/typescript';
-import html from 'highlight.js/lib/languages/xml';
+import Table from "@tiptap/extension-table"; // its borken for some reason
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TableRow from "@tiptap/extension-table-row";
+import TaskItem from "@tiptap/extension-task-item";
+import TaskList from "@tiptap/extension-task-list";
+import TextAlign from "@tiptap/extension-text-align";
+import Underline from "@tiptap/extension-underline";
+import Typography from "@tiptap/extension-typography";
+import TextStyle from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import css from "highlight.js/lib/languages/css";
+import js from "highlight.js/lib/languages/javascript";
+import ts from "highlight.js/lib/languages/typescript";
+import html from "highlight.js/lib/languages/xml";
 // load all highlight.js languages
-import { lowlight } from 'lowlight';
+import { lowlight } from "lowlight";
 
-import suggestion from './suggestion';
-import CodeBlockComponent from './CodeBlockComponent.vue';
+import suggestion from "./suggestion";
+import CodeBlockComponent from "./CodeBlockComponent.vue";
 
-lowlight.registerLanguage('html', html);
-lowlight.registerLanguage('css', css);
-lowlight.registerLanguage('js', js);
-lowlight.registerLanguage('javascript', js);
-lowlight.registerLanguage('ts', ts);
-lowlight.registerLanguage('typescript', ts);
+lowlight.registerLanguage("html", html);
+lowlight.registerLanguage("css", css);
+lowlight.registerLanguage("js", js);
+lowlight.registerLanguage("javascript", js);
+lowlight.registerLanguage("ts", ts);
+lowlight.registerLanguage("typescript", ts);
 
-const editor = ref(null);
+const editor = ref<Editor | undefined>(undefined);
 const limit = ref(10000);
 const { text, copy, copied, isSupported } = useClipboard({ legacy: true });
 
 const copyContent = async () => {
-  const content = editor.value.getText({
-    blockSeparator: '\n\n',
+  const content = editor.value?.getText({
+    blockSeparator: "\n\n",
     textSerializers: {
       youtube: ({ node }) => {
-        console.log('Youtube|node -> ', node);
+        console.log("Youtube|node -> ", node);
         return `![](${node.attrs.src})\n\n`;
       },
       image: ({ node }) => {
-        console.log('Image|node ->', node);
-        return `![${node.attrs.alt || ''}](${node.attrs.src})\n\n`;
+        console.log("Image|node ->", node);
+        return `![${node.attrs.alt || ""}](${node.attrs.src})\n\n`;
       },
     },
   });
   console.log(content);
+  if (!content) {
+    return;
+  }
   await copy(content);
 };
 
 const copyContentJson = async () => {
-  const contentJson = editor.value.getJSON();
+  const contentJson = editor.value?.getJSON() || {};
   console.log(contentJson);
   await copy(JSON.stringify(contentJson));
+};
+
+const copyContentHTML = async () => {
+  const contentHtml = editor.value?.getHTML() || "";
+  console.log(contentHtml);
+  await copy(contentHtml);
+};
+
+const initalContent = {
+  type: "doc",
+  content: [
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Let‘s make sure people can’t write more than 280 characters. I bet you could build one of the biggest social networks on that idea. 🎉",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "That’s a boring paragraph followed by a fenced code block:",
+        },
+      ],
+    },
+    {
+      type: "codeBlock",
+      attrs: {
+        language: "javascript",
+      },
+      content: [
+        {
+          type: "text",
+          text: 'for (var i=1; i <= 20; i++)\n{\n  if (i % 15 == 0)\n    console.log("FizzBuzz");\n  else if (i % 3 == 0)\n    console.log("Fizz");\n  else if (i % 5 == 0)\n    console.log("Buzz");\n  else\n    console.log(i);\n}',
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Press Command/Ctrl + Enter to leave the fenced code block and continue typing in boring paragraphs.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "This isn’t highlighted.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "highlight",
+              attrs: {
+                color: "",
+              },
+            },
+          ],
+          text: "But that one is.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "highlight",
+              attrs: {
+                color: "red",
+              },
+            },
+          ],
+          text: "And this is highlighted too, but in a different color.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "highlight",
+              attrs: {
+                color: "#ffa8a8",
+              },
+            },
+          ],
+          text: "And this one has a data attribute.",
+        },
+      ],
+    },
+    {
+      type: "image",
+      attrs: {
+        src: "https://source.unsplash.com/K9QHL52rE2k/100x100",
+        alt: null,
+        title: null,
+      },
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+    },
+    {
+      type: "image",
+      attrs: {
+        src: "data:image/jpeg;base64,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",
+        alt: "a random image from unsplash.com",
+        title: null,
+      },
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Wow, this editor has support for links to the whole ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "link",
+              attrs: {
+                href: "https://en.wikipedia.org/wiki/World_Wide_Web",
+                target: "_blank",
+                class: null,
+              },
+            },
+          ],
+          text: "world wide web",
+        },
+        {
+          type: "text",
+          text: ". We tested a lot of URLs and I think you can add *every URL* you want. Isn’t that cool? Let’s try ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "link",
+              attrs: {
+                href: "https://statamic.com/",
+                target: "_blank",
+                class: null,
+              },
+            },
+          ],
+          text: "another one!",
+        },
+        {
+          type: "text",
+          text: " Yep, seems to work.",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Mentions",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Hi everyone! Don’t forget the daily stand up at 8 AM.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "mention",
+          attrs: {
+            id: "Jennifer Grey",
+            label: null,
+          },
+        },
+        {
+          type: "text",
+          text: " Would you mind to share what you’ve been working on lately? We fear not much happened since Dirty Dancing.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "mention",
+          attrs: {
+            id: "Winona Ryder",
+            label: null,
+          },
+        },
+        {
+          type: "text",
+          text: " ",
+        },
+        {
+          type: "mention",
+          attrs: {
+            id: "Axl Rose",
+            label: null,
+          },
+        },
+        {
+          type: "text",
+          text: " Let’s go through your most important points quickly.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "I have a meeting with ",
+        },
+        {
+          type: "mention",
+          attrs: {
+            id: "Christina Applegate",
+            label: null,
+          },
+        },
+        {
+          type: "text",
+          text: " and don’t want to come late.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "– Thanks, your big boss",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Superscript & subscript",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "This is regular text.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "superscript",
+            },
+          ],
+          text: "This is superscript.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "textStyle",
+              attrs: {
+                color: "",
+              },
+            },
+            {
+              type: "superscript",
+            },
+          ],
+          text: "And this.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "subscript",
+            },
+          ],
+          text: "This is subscript.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "textStyle",
+              attrs: {
+                color: "",
+              },
+            },
+            {
+              type: "subscript",
+            },
+          ],
+          text: "And this.",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Task List",
+        },
+      ],
+    },
+    {
+      type: "taskList",
+      content: [
+        {
+          type: "taskItem",
+          attrs: {
+            checked: true,
+          },
+          content: [
+            {
+              type: "paragraph",
+              attrs: {
+                textAlign: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: "A list item",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "taskItem",
+          attrs: {
+            checked: false,
+          },
+          content: [
+            {
+              type: "paragraph",
+              attrs: {
+                textAlign: "left",
+              },
+              content: [
+                {
+                  type: "text",
+                  text: "And another one",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Text Alignment",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "first paragraph",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "center",
+      },
+      content: [
+        {
+          type: "text",
+          text: "second paragraph",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "right",
+      },
+      content: [
+        {
+          type: "text",
+          text: "third paragraph",
+        },
+      ],
+    },
+    {
+      type: "horizontalRule",
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "hardBreak",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Underlines",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "There is no underline here.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "underline",
+            },
+          ],
+          text: "This is underlined though.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "underline",
+            },
+          ],
+          text: "And this as well.",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Typography",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "“I have been suffering from Typomania all my life, a sickness that is incurable but not lethal.”",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "— Erik Spiekermann, December 2008",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Blockquote",
+        },
+      ],
+    },
+    {
+      type: "blockquote",
+      content: [
+        {
+          type: "paragraph",
+          attrs: {
+            textAlign: "left",
+          },
+          content: [
+            {
+              type: "text",
+              text: "Nothing is impossible, the word itself says “I’m possible!”",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "TextStyle & Color",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          marks: [
+            {
+              type: "textStyle",
+              attrs: {
+                color: "rgb(149, 141, 241)",
+              },
+            },
+          ],
+          text: "Oh, for some reason that’s purple.",
+        },
+      ],
+    },
+    {
+      type: "horizontalRule",
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Markdown shortcuts make it easy to format the text while typing.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "To test that, start a new line and type ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "#",
+        },
+        {
+          type: "text",
+          text: " followed by a space to get a heading. Try ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "#",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "##",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "###",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "####",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "#####",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "######",
+        },
+        {
+          type: "text",
+          text: " for different levels.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Those conventions are called input rules in tiptap. Some of them are enabled by default. Try ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: ">",
+        },
+        {
+          type: "text",
+          text: " for blockquotes, ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "*",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "-",
+        },
+        {
+          type: "text",
+          text: " or ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "+",
+        },
+        {
+          type: "text",
+          text: " for bullet lists, or ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "`foobar`",
+        },
+        {
+          type: "text",
+          text: " to highlight code, ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "~~tildes~~",
+        },
+        {
+          type: "text",
+          text: " to strike text, or ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "==equal signs==",
+        },
+        {
+          type: "text",
+          text: " to highlight text.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "You can overwrite existing input rules or add your own to nodes, marks and extensions.",
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "For example, we added the ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "Typography",
+        },
+        {
+          type: "text",
+          text: " extension here. Try typing ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "(c)",
+        },
+        {
+          type: "text",
+          text: " to see how it’s converted to a proper © character. You can also try ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "->",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: ">>",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "1/2",
+        },
+        {
+          type: "text",
+          text: ", ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "!=",
+        },
+        {
+          type: "text",
+          text: ", or ",
+        },
+        {
+          type: "text",
+          marks: [
+            {
+              type: "code",
+            },
+          ],
+          text: "--",
+        },
+        {
+          type: "text",
+          text: ".",
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Tables",
+        },
+      ],
+    },
+    {
+      type: "table",
+      content: [
+        {
+          type: "tableRow",
+          content: [
+            {
+              type: "tableHeader",
+              attrs: {
+                colspan: 1,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "Name",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableHeader",
+              attrs: {
+                colspan: 3,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "Description",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "tableRow",
+          content: [
+            {
+              type: "tableCell",
+              attrs: {
+                colspan: 1,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "Cyndi Lauper",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableCell",
+              attrs: {
+                colspan: 1,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "singer",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableCell",
+              attrs: {
+                colspan: 1,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "songwriter",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableCell",
+              attrs: {
+                colspan: 1,
+                rowspan: 1,
+                colwidth: null,
+              },
+              content: [
+                {
+                  type: "paragraph",
+                  attrs: {
+                    textAlign: "left",
+                  },
+                  content: [
+                    {
+                      type: "text",
+                      text: "actress",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "heading",
+      attrs: {
+        textAlign: "left",
+        level: 1,
+      },
+      content: [
+        {
+          type: "text",
+          text: "Youtube Video",
+        },
+      ],
+    },
+    {
+      type: "youtube",
+      attrs: {
+        src: "https://www.youtube.com/watch?v=cqHqLQgVCgY",
+        start: 0,
+        width: 640,
+        height: 480,
+      },
+    },
+    {
+      type: "paragraph",
+      attrs: {
+        textAlign: "left",
+      },
+      content: [
+        {
+          type: "text",
+          text: "Try adding your own video to this editor!",
+        },
+      ],
+    },
+  ],
 };
 
 tryOnMounted(() => {
   editor.value = new Editor({
     // content2: '',
     // content: '<p>I’m running Tiptap with Vue.js. 🎉</p>',
-    content: `
-      <p>
-          Let‘s make sure people can’t write more than 280 characters. I bet you could build one of the biggest social networks on that idea. 🎉
-        </p>
-
-        <p>
-          That’s a boring paragraph followed by a fenced code block:
-        </p>
-        <pre><code class="language-javascript">for (var i=1; i <= 20; i++)
-{
-  if (i % 15 == 0)
-    console.log("FizzBuzz");
-  else if (i % 3 == 0)
-    console.log("Fizz");
-  else if (i % 5 == 0)
-    console.log("Buzz");
-  else
-    console.log(i);
-}</code></pre>
-        <p>
-          Press Command/Ctrl + Enter to leave the fenced code block and continue typing in boring paragraphs.
-        </p>
-        <p>This isn’t highlighted.</s></p>
-        <p><mark>But that one is.</mark></p>
-        <p><mark style="background-color: red;">And this is highlighted too, but in a different color.</mark></p>
-        <p><mark data-color="#ffa8a8">And this one has a data attribute.</mark></p>
-
-        <img src="https://source.unsplash.com/K9QHL52rE2k/100x100" />
-
-        <p>
-          Wow, this editor has support for links to the whole <a href="https://en.wikipedia.org/wiki/World_Wide_Web">world wide web</a>. We tested a lot of URLs and I think you can add *every URL* you want. Isn’t that cool? Let’s try <a href="https://statamic.com/">another one!</a> Yep, seems to work.
-        </p>
-
-        <h1>Mentions</h1>
-        <p>Hi everyone! Don’t forget the daily stand up at 8 AM.</p>
-        <p><span data-type="mention" data-id="Jennifer Grey"></span> Would you mind to share what you’ve been working on lately? We fear not much happened since Dirty Dancing.
-        <p><span data-type="mention" data-id="Winona Ryder"></span> <span data-type="mention" data-id="Axl Rose"></span> Let’s go through your most important points quickly.</p>
-        <p>I have a meeting with <span data-type="mention" data-id="Christina Applegate"></span> and don’t want to come late.</p>
-        <p>– Thanks, your big boss</p>
-
-        <h1>Superscript & subscript</h1>
-        <p>This is regular text.</p>
-        <p><sup>This is superscript.</sup></p>
-        <p><span style="vertical-align: super">And this.</span></p>
-
-        <p><sub>This is subscript.</sub></p>
-        <p><span style="vertical-align: sub">And this.</span></p>
-
-        <h1>Task List</h1>
-        <ul data-type="taskList">
-          <li data-type="taskItem" data-checked="true">A list item</li>
-          <li data-type="taskItem" data-checked="false">And another one</li>
-        </ul>
-
-
-        <h1>Text Alignment</h1>
-        <p>first paragraph</p>
-        <p style="text-align: center">second paragraph</p>
-        <p style="text-align: right">third paragraph</p>
-
-        <hr>
-        <br>
-        <h1>Underlines</h1>
-        <p>There is no underline here.</p>
-        <p><u>This is underlined though.</u></p>
-        <p style="text-decoration: underline">And this as well.</p>
-
-        <h1>Typography</h1>
-        <p>“I have been suffering from Typomania all my life, a sickness that is incurable but not lethal.”</p>
-        <p>— Erik Spiekermann, December 2008</p>
-
-        <h1>Blockquote</h1>
-        <blockquote>
-            Nothing is impossible, the word itself says “I’m possible!”
-          </blockquote>
-
-        <h1>TextStyle & Color</h1>
-        <p><span style="color: #958DF1">Oh, for some reason that’s purple.</span></p>
-
-        <hr>
-        <p>
-          Markdown shortcuts make it easy to format the text while typing.
-        </p>
-        <p>
-          To test that, start a new line and type <code>#</code> followed by a space to get a heading. Try <code>#</code>, <code>##</code>, <code>###</code>, <code>####</code>, <code>#####</code>, <code>######</code> for different levels.
-        </p>
-        <p>
-          Those conventions are called input rules in tiptap. Some of them are enabled by default. Try <code>></code> for blockquotes, <code>*</code>, <code>-</code> or <code>+</code> for bullet lists, or <code>\`foobar\`</code> to highlight code, <code>~~tildes~~</code> to strike text, or <code>==equal signs==</code> to highlight text.
-        </p>
-        <p>
-          You can overwrite existing input rules or add your own to nodes, marks and extensions.
-        </p>
-        <p>
-          For example, we added the <code>Typography</code> extension here. Try typing <code>(c)</code> to see how it’s converted to a proper © character. You can also try <code>-></code>, <code>>></code>, <code>1/2</code>, <code>!=</code>, or <code>--</code>.
-        </p>
-
-        <h1>Tables</h1>
-        <table>
-          <tbody>
-            <tr>
-              <th>Name</th>
-              <th colspan="3">Description</th>
-            </tr>
-            <tr>
-              <td>Cyndi Lauper</td>
-              <td>singer</td>
-              <td>songwriter</td>
-              <td>actress</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <h1>Youtube Video</h1>
-        <div data-youtube-video>
-          <iframe src="https://www.youtube.com/watch?v=cqHqLQgVCgY"></iframe>
-        </div>
-        <p>Try adding your own video to this editor!</p>
-
-      `,
+    content: initalContent,
     extensions: [
       StarterKit.configure({
         // Disable an included extension
@@ -672,6 +1796,7 @@ tryOnMounted(() => {
       TextStyle,
       Color,
       Image.configure({
+        inline: false,
         allowBase64: true,
       }),
       Superscript,
@@ -695,13 +1820,13 @@ tryOnMounted(() => {
       }),
       Mention.configure({
         HTMLAttributes: {
-          class: 'mention',
+          class: "mention",
         },
         suggestion,
       }),
       Placeholder.configure({
         // Use a placeholder:
-        placeholder: 'Write something …',
+        placeholder: "Write something …",
         // Use different placeholders depending on the node type:
         // placeholder: ({ node }) => {
         //   if (node.type.name === 'heading') {
@@ -723,7 +1848,7 @@ tryOnMounted(() => {
         nested: true,
       }),
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ["heading", "paragraph"],
       }),
     ],
   });
@@ -735,21 +1860,36 @@ tryOnBeforeUnmount(() => {
 
 const addVideo = () => {
   const url = prompt(
-    'Enter YouTube URL',
-    'https://www.youtube.com/watch?v=b61rtYhuyag'
+    "Enter YouTube URL",
+    "https://www.youtube.com/watch?v=b61rtYhuyag"
   );
-  editor.value.commands.setYoutubeVideo({
+
+  if (!url) {
+    return;
+  }
+
+  editor.value?.commands.setYoutubeVideo({
     src: url,
     width: 640,
     height: 480,
   });
 };
 
-const addImage = () => {};
+const addImage = () => {
+  // editor.value?.chain().focus().setImage({ src: 'https://source.unsplash.com/K9QHL52rE2k/100x100', alt: 'a random image from unsplash.com' }).run()
+  editor.value
+    ?.chain()
+    .focus()
+    .setImage({
+      src: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gIcSUNDX1BST0ZJTEUAAQEAAAIMbGNtcwIQAABtbnRyUkdCIFhZWiAH3AABABkAAwApADlhY3NwQVBQTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLWxjbXMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApkZXNjAAAA/AAAAF5jcHJ0AAABXAAAAAt3dHB0AAABaAAAABRia3B0AAABfAAAABRyWFlaAAABkAAAABRnWFlaAAABpAAAABRiWFlaAAABuAAAABRyVFJDAAABzAAAAEBnVFJDAAABzAAAAEBiVFJDAAABzAAAAEBkZXNjAAAAAAAAAANjMgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB0ZXh0AAAAAElYAABYWVogAAAAAAAA9tYAAQAAAADTLVhZWiAAAAAAAAADFgAAAzMAAAKkWFlaIAAAAAAAAG+iAAA49QAAA5BYWVogAAAAAAAAYpkAALeFAAAY2lhZWiAAAAAAAAAkoAAAD4QAALbPY3VydgAAAAAAAAAaAAAAywHJA2MFkghrC/YQPxVRGzQh8SmQMhg7kkYFUXdd7WtwegWJsZp8rGm/fdPD6TD////bAIQAAgMDAwQDBAUFBAYGBgYGCAgHBwgIDQkKCQoJDRMMDgwMDgwTERQRDxEUER4YFRUYHiMdHB0jKiUlKjUyNUVFXAECAwMDBAMEBQUEBgYGBgYICAcHCAgNCQoJCgkNEwwODAwODBMRFBEPERQRHhgVFRgeIx0cHSMqJSUqNTI1RUVc/8AAEQgAZABkAwEiAAIRAQMRAf/EAHIAAAEFAQEBAAAAAAAAAAAAAAACAwQFBgEHCRAAAgIBAwIEAwYGAwEAAAAAAQIAAxEEEiExUQUTQXEiYYEyQlJykaEUI7GywdE0U5KiAQEAAAAAAAAAAAAAAAAAAAAAEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwD47+W/oM+3MSGYdCZwH1Bjy2kH4lV/cQEb29cH3EUHTPNYP1IknGiZeDbW3zw6/tzO/wAFeVLVhbV71ndAaQaU/bNq8egDc/UiOLTpWP8Aygv5q2/xmQG+EkN8J7HiECxGisYnZbTZ+Wwf0MQ+i1ijJofHcDMgnnrzFKzJ9klfykj+kDjAr1BHuImWA12sAA89yOxw392Y4dazNl6KH968f2kQKyEnG3THrpgv5XP+ZwjRnobV9wGgV8JM8qk9Lx9VMIErzaLuLEVG/wCxBj9RGb9LZUNxwyHo68qZCkzT6q6hso3XqCMg+4gQ4pWKsGBII6EHBl4E0WqPwkaew/dP2GPy7Su1Gk1GnfbYhXseoPsYE1PFdYMB2W4DoLFDfvE58Mt+5Zpz8j5if7lPCBet4VcyBqLqtQO1Z+IfQymdHRsOjKezDEQCQQQcHuODLmnxXXVqVLixSMbbF3iBSwmiSzwe8/zan0x/FV8Sf+Y6/gtzDdp7a70PTacH9IGYhHrKrKzh0Kn5xmAQnIQLS/S7UFifFWf2lZLDS6pqW5G5D1UyXq9DsQXVgmo//MCkltp/ELql2MBZWeqPzKmEDWjw3Tayvfo2ff8AepbGAPkeszFtVlTlHUqw9DFUX202B62KsJ6Jpb9JrtNi2neR1GeQflA8zhNbq/BLAN+nJsX1Q/aH+xMmQQSCMEQOR2q2ypwyMVYeojUIGrq8XFgxqEDH8Y/yI9fp9NcTZtUBjx5YCj9BMdJVN9lRO08HqDAmvo0DcW8e0JJGqobknb8oQM/Nd4XY70tWTkZxt68GZGafwZiLLOe0A8R8It09a3oVapiRgOCyEfiUcgdiZmJ7ACfiBQHd9Z514nov4e7KqQj8r8vlApJZaHUnT6lHyQOjY7GVsIHsNA82zbWtjuxG1UBZmPyAhq/C69TUr3VFS4fZZ9knYcH9Jm9NqLhRVYhZSqD4kYow9MggggywrdEGVQbrDuc/iJ7wMPrdBfpX+LlfRhKqeqKPNLgpuXBLL2UdZi9f4f5TM1YJTPTrj2PrAz8IQgEIQgE1fhtWKix9TM1VWbLAom6HFYCjbjECxR2Hcxy3TrqKWRxgEde3YyKmSc7vrJAuYL3geYWVtW7I3VTgxuaLxar+YtgHXgzOwNppXYaOsDriWO/gFjuAxnHHEqa+KaRkfCq8dCZd268BdTVpkspov2bqntFpO07gWbvnniAWU2eQthQeW7EK2c8juJFFrJ229sSOLSqsuQAcEgfeIje7JPU4gVWo0TvvepGbaCzgei95QTXOA3J7yl1VAB3qPzCBVQnYQNBpECLk9TLVnRsYGP3zK0ElhzJ9Xl7LMvtYDKjbnce2c8QJIsx69IveSTxIoK8AH9Z0Ee0BrWruosGegyB7TJ1rudR3M1zkFWGOoIlBpa2AL445UH+sC7sXbs+Y6zjbd68n4j+kiLtbJJ+ke8w8D8MCT9gnsf3imuzj147Y49BIW/DDBPBjquArZQHcMKTkYPcQE2fDwTn2Mj7ueefecd8xvPy4gV70HdlekJKJhAsdonTCEBeBFjkwhASehkRUUUtj7oX94QgNJHmYgkYEIQEE9fpEsTzCEBG9hGoQgNmEIQP/2Q==",
+      alt: "a random image from unsplash.com",
+    })
+    .run();
+};
 
 const setLink = () => {
-  const previousUrl = editor.value.getAttributes('link').href;
-  const url = window.prompt('URL', previousUrl);
+  const previousUrl = editor.value?.getAttributes("link").href;
+  const url = window.prompt("URL", previousUrl);
 
   // cancelled
   if (url === null) {
@@ -757,17 +1897,17 @@ const setLink = () => {
   }
 
   // empty
-  if (url === '') {
-    editor.value.chain().focus().extendMarkRange('link').unsetLink().run();
+  if (url === "") {
+    editor.value?.chain().focus().extendMarkRange("link").unsetLink().run();
 
     return;
   }
 
   // update link
   editor.value
-    .chain()
+    ?.chain()
     .focus()
-    .extendMarkRange('link')
+    .extendMarkRange("link")
     .setLink({ href: url })
     .run();
 };
@@ -834,7 +1974,7 @@ const setLink = () => {
   pre {
     background: #0d0d0d;
     color: #fff;
-    font-family: 'JetBrainsMono', monospace;
+    font-family: "JetBrainsMono", monospace;
     padding: 0.75rem 1rem;
     border-radius: 0.5rem;
 
@@ -928,7 +2068,7 @@ const setLink = () => {
     .selectedCell:after {
       z-index: 2;
       position: absolute;
-      content: '';
+      content: "";
       left: 0;
       right: 0;
       top: 0;
@@ -996,7 +2136,7 @@ mark {
   box-decoration-break: clone;
 }
 
-ul[data-type='taskList'] {
+ul[data-type="taskList"] {
   list-style: none;
   padding: 0;
 
