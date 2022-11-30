@@ -1,7 +1,6 @@
 <template>
   <div v-if="editor">
-    <button @click="copyContentJson">Copy Content (JSON)</button>
-    <button @click="copyContent">Copy Content (Plain Text)</button>
+    <button @click="logContent">Log Content!</button>
     <button @click="addVideo">Add Video</button>
     <button @click="addImage">setImage</button>
     <input
@@ -459,9 +458,7 @@
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from 'vue';
-import { tryOnMounted, tryOnBeforeUnmount, useClipboard } from '@vueuse/core';
+<script lang="ts">
 import {
   BubbleMenu,
   Editor,
@@ -512,27 +509,25 @@ lowlight.registerLanguage('javascript', js);
 lowlight.registerLanguage('ts', ts);
 lowlight.registerLanguage('typescript', ts);
 
-const editor = ref(null);
-const limit = ref(10000);
-const { text, copy, copied, isSupported } = useClipboard({ legacy: true });
+export default {
+  components: {
+    EditorContent,
+    BubbleMenu,
+    FloatingMenu,
+  },
 
-const copyContent = async () => {
-  const content = editor.value.getText();
-  console.log(content);
-  await copy(content);
-};
+  data(): { editor: any; limit: number } {
+    return {
+      editor: null,
+      limit: 10000,
+    };
+  },
 
-const copyContentJson = async () => {
-  const contentJson = editor.value.getJSON();
-  console.log(contentJson);
-  await copy(JSON.stringify(contentJson));
-};
-
-tryOnMounted(() => {
-  editor.value = new Editor({
-    // content2: '',
-    // content: '<p>I’m running Tiptap with Vue.js. 🎉</p>',
-    content: `
+  mounted() {
+    this.editor = new Editor({
+      // content2: '',
+      // content: '<p>I’m running Tiptap with Vue.js. 🎉</p>',
+      content: `
       <p>
           Let‘s make sure people can’t write more than 280 characters. I bet you could build one of the biggest social networks on that idea. 🎉
         </p>
@@ -651,111 +646,115 @@ tryOnMounted(() => {
         <p>Try adding your own video to this editor!</p>
 
       `,
-    extensions: [
-      StarterKit.configure({
-        // Disable an included extension
-        codeBlock: false,
-      }),
-      Typography,
-      TextStyle,
-      Color,
-      Image,
-      Superscript,
-      Subscript,
-      Underline,
-      CharacterCount.configure({ limit: limit.value }),
-      Highlight.configure({ multicolor: true }),
-      Youtube.configure({
-        nocookie: true,
-        controls: true,
-        allowFullscreen: true,
-        autoplay: false,
-      }),
-      CodeBlockLowlight.extend({
-        addNodeView() {
-          return VueNodeViewRenderer(CodeBlockComponent);
-        },
-      }).configure({ lowlight }),
-      Link.configure({
-        openOnClick: false,
-      }),
-      Mention.configure({
-        HTMLAttributes: {
-          class: 'mention',
-        },
-        suggestion,
-      }),
-      Placeholder.configure({
-        // Use a placeholder:
-        placeholder: 'Write something …',
-        // Use different placeholders depending on the node type:
-        // placeholder: ({ node }) => {
-        //   if (node.type.name === 'heading') {
-        //     return 'What’s the title?'
-        //   }
+      extensions: [
+        StarterKit.configure({
+          // Disable an included extension
+          codeBlock: false,
+        }),
+        Typography,
+        TextStyle,
+        Color,
+        Image,
+        Superscript,
+        Subscript,
+        Underline,
+        CharacterCount.configure({ limit: this.limit }),
+        Highlight.configure({ multicolor: true }),
+        Youtube.configure({
+          nocookie: true,
+          controls: true,
+          allowFullscreen: true,
+          autoplay: false,
+        }),
+        CodeBlockLowlight.extend({
+          addNodeView() {
+            return VueNodeViewRenderer(CodeBlockComponent);
+          },
+        }).configure({ lowlight }),
+        Link.configure({
+          openOnClick: false,
+        }),
+        Mention.configure({
+          HTMLAttributes: {
+            class: 'mention',
+          },
+          suggestion,
+        }),
+        Placeholder.configure({
+          // Use a placeholder:
+          placeholder: 'Write something …',
+          // Use different placeholders depending on the node type:
+          // placeholder: ({ node }) => {
+          //   if (node.type.name === 'heading') {
+          //     return 'What’s the title?'
+          //   }
 
-        //   return 'Can you add some further context?'
-        // },
-      }),
-      // --- Table extensions ----
-      Table.configure({
-        resizable: true,
-      }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      TextAlign.configure({
-        types: ['heading', 'paragraph'],
-      }),
-    ],
-  });
-});
+          //   return 'Can you add some further context?'
+          // },
+        }),
+        // --- Table extensions ----
+        Table.configure({
+          resizable: true,
+        }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
+        TextAlign.configure({
+          types: ['heading', 'paragraph'],
+        }),
+      ],
+    });
+  },
 
-tryOnBeforeUnmount(() => {
-  editor.value?.destroy();
-});
+  beforeUnmount() {
+    this.editor.destroy();
+  },
 
-const addVideo = () => {
-  const url = prompt(
-    'Enter YouTube URL',
-    'https://www.youtube.com/watch?v=b61rtYhuyag'
-  );
-  editor.value.commands.setYoutubeVideo({
-    src: url,
-    width: 640,
-    height: 480,
-  });
-};
+  methods: {
+    logContent() {
+      console.log(JSON.stringify(this.editor.getJSON()));
+    },
+    addVideo() {
+      const url = prompt(
+        'Enter YouTube URL',
+        'https://www.youtube.com/watch?v=b61rtYhuyag'
+      );
+      this.editor.commands.setYoutubeVideo({
+        src: url,
+        width: 640,
+        height: 480,
+      });
+    },
+    addImage() {},
+    setLink() {
+      const previousUrl = this.editor.getAttributes('link').href;
+      const url = window.prompt('URL', previousUrl);
 
-const addImage = () => {};
+      // cancelled
+      if (url === null) {
+        return;
+      }
 
-const setLink = () => {
-  const previousUrl = editor.value.getAttributes('link').href;
-  const url = window.prompt('URL', previousUrl);
+      // empty
+      if (url === '') {
+        this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
 
-  // cancelled
-  if (url === null) {
-    return;
-  }
+        return;
+      }
 
-  // empty
-  if (url === '') {
-    editor.value.chain().focus().extendMarkRange('link').unsetLink().run();
-
-    return;
-  }
-
-  // update link
-  editor.value
-    .chain()
-    .focus()
-    .extendMarkRange('link')
-    .setLink({ href: url })
-    .run();
+      // update link
+      this.editor
+        .chain()
+        .focus()
+        .extendMarkRange('link')
+        .setLink({ href: url })
+        .run();
+    },
+  },
 };
 </script>
 
